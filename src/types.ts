@@ -4,10 +4,6 @@ export type Format = {
   highlightNumber?: number;
 };
 
-export type Highlight = {
-  [key: string]: Highlight | string[];
-};
-
 export type Property = {
   [key: string]: string[] | string;
 };

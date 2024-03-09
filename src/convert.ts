@@ -1,16 +1,22 @@
 import * as fs from 'fs-extra';
-import { Config, Format, Highlight, Property } from './types';
+import { Config, Format, Property } from './types';
 import path from 'path';
+import { Book, Node } from './book';
 
 export class Convert {
   static basePath = 'vault/';
+  private highlightIndexMap = new Map<string, number>();
   config: Config;
-  bookName: string = '';
-  lines: string[] = [];
-  currLineIndex = 0;
+  book: Book | null = null;
 
   constructor(config: Config) {
     this.config = config;
+
+    const fileName = this.config.fileName;
+    if (!fs.existsSync(fileName)) throw new Error(`${fileName} not found`);
+    const inputFile = fs.readFileSync(fileName, 'utf-8');
+    const lines = inputFile.split('\n');
+    this.book = new Book(lines);
   }
 
   getValueAfterFormat = (value: string, format: Format) => {
@@ -20,7 +26,9 @@ export class Convert {
       highlightNumber: highlight_number,
     } = format;
 
-    value = value.replace(/{book_name}/g, this.bookName);
+    if (!this.book) throw new Error('book is required');
+
+    value = value.replace(/{book_name}/g, this.book.bookName);
 
     const todayDateRegex = /{today_date}/g;
     if (todayDateRegex.test(value)) {
@@ -62,57 +70,6 @@ export class Convert {
     return value;
   };
 
-  getHighlights = (layer = 0) => {
-    const highLightResult: Highlight = {};
-    const result: string[] = [];
-
-    // read file if lines are empty
-    if (this.lines.length === 0) {
-      const { fileName } = this.config;
-      const highlights = fs.readFileSync(fileName, 'utf8');
-      this.lines = highlights.split('\n');
-    }
-
-    // start process the file
-    let cache = '';
-    while (this.currLineIndex < this.lines.length) {
-      const line = this.lines[this.currLineIndex];
-
-      // book name
-      if (this.currLineIndex === 0) {
-        this.bookName = line;
-        this.currLineIndex++;
-        continue;
-      }
-
-      // empty line
-      if (line.trim() === '') {
-        cache && result.push(cache);
-        cache = '';
-        this.currLineIndex++;
-        continue;
-      }
-
-      const lineLayer = line.match(/#/g)?.length || 0;
-      // highlight
-      if (lineLayer === 0) {
-        if (cache != '') cache += '\n';
-        cache += line;
-        this.currLineIndex++;
-        continue;
-      }
-
-      // new chapter
-      if (lineLayer <= layer) break;
-      this.currLineIndex++;
-      const title = line.replace(/#/g, '').trim();
-      const highlights = this.getHighlights(lineLayer);
-      highLightResult[title] = highlights;
-    }
-
-    return result.length ? result : highLightResult;
-  };
-
   getTagContent = (property: Property | undefined, format: Format) => {
     let tagContent = `---\n`;
     if (property) {
@@ -128,11 +85,11 @@ export class Convert {
         }
       }
     }
-    tagContent += `---\n`;
+    tagContent += `---`;
     return tagContent;
   };
 
-  generateFiles = (highlight: Highlight) => {
+  private generateBook = () => {
     // book
     const bookPath = this.getValueAfterFormat(this.config.bookPath, {});
     const fullBooKPath = path.join(Convert.basePath, bookPath);
@@ -143,112 +100,131 @@ export class Convert {
     const bookContent = `${bookTagContent}
 # Chapters
 
-${Object.keys(highlight)
-  .map((chapterName) => `- [[${chapterName}]]`)
+${this.book
+  ?.getChaptersOnly(1)
+  .map((chapter) => `- [[${chapter.text}]]`)
   .join('\n')}
 `;
     fs.writeFileSync(`${fullBooKPath}.md`, bookContent);
+  };
 
-    // chapters
-    const generateChapter = (
-      chapterName: string,
-      chapterHighlight: Highlight | string[],
-    ) => {
-      const chapterPath = this.getValueAfterFormat(this.config.chapterPath, {
-        chapterName,
-      });
-      const fullChapterPath = path.join(Convert.basePath, chapterPath);
-      if (!fs.existsSync(path.dirname(fullChapterPath))) {
-        fs.mkdirSync(path.dirname(fullChapterPath), { recursive: true });
-      }
-      const chapterTagContent = this.getTagContent(
-        this.config.properties.chapter,
-        { chapterName },
-      );
-      let chapterContent = '';
-      const highlights = [] as string[];
-      if (Array.isArray(chapterHighlight)) {
-        // chapter
-        chapterContent = `${chapterTagContent}
-# Highlights
+  private generateChaptersAndHighlights = () => {
+    // create chapter folder
+    const chapterFolder = path.dirname(
+      this.getValueAfterFormat(this.config.chapterPath, {
+        chapterName: 'file',
+      }),
+    );
+    const fullChapterFolder = path.join(Convert.basePath, chapterFolder);
+    if (!fs.existsSync(fullChapterFolder)) {
+      fs.mkdirSync(fullChapterFolder, { recursive: true });
+    }
 
-${chapterHighlight
-  .map(
-    (highlightName, index) =>
-      `- [[${this.getValueAfterFormat(this.config.highlightsPath, {
-        chapterName,
-        highlightText: highlightName,
-        highlightNumber: index + 1,
-      })}|${highlightName.replace(/\n/g, ' ')}]]`,
-  )
-  .join('\n')}
-`;
+    // create chapter files
+    const chapters = this.book?.getChapters();
+    if (!chapters) return;
 
-        // highlights
-        highlights.push(...chapterHighlight);
-      } else {
-        // chapter
-        let index = 0;
-        const getChapterList = (chapter: Highlight | string[], layer = 1) => {
-          const result: string[] = [];
-          if (Array.isArray(chapter)) {
-            highlights.push(...chapter);
-            return chapter.map(
-              (highlightName) =>
-                `- [[${this.getValueAfterFormat(this.config.highlightsPath, {
-                  chapterName,
-                  highlightText: highlightName,
-                  highlightNumber: ++index,
-                })}|${highlightName.replace(/\n/g, ' ')}]]`,
-            );
-          }
-          for (const key in chapter) {
-            const value = chapter[key];
-            const chapterList = getChapterList(value, layer + 1).join('\n');
-            result.push(`#`.repeat(layer) + ` ${key}\n\n${chapterList}\n`);
-          }
-          return result;
-        };
-        chapterContent = `${chapterTagContent}
-${getChapterList(chapterHighlight).join('\n')}
-`;
-      }
+    const highlightIndexMap = new Map<string, number>();
+    const getChapterBody = (chapter: Node, chapterName?: string, layer = 1) => {
+      let result = '';
+      if (chapter.type === 'highlight') {
+        // update highlight index
+        const highlightIndex = highlightIndexMap.get(chapterName!) || 1;
+        highlightIndexMap.set(chapterName!, highlightIndex + 1);
 
-      // highlights
-      let index = 0;
-      for (const highlightName of highlights) {
-        const highlightPath = this.getValueAfterFormat(
+        return `${'  '.repeat(layer - 1)}- [[${this.getValueAfterFormat(
           this.config.highlightsPath,
           {
             chapterName,
-            highlightText: highlightName,
-            highlightNumber: ++index,
+            highlightText: chapter.text,
+            highlightNumber: highlightIndex,
+          },
+        )}|${chapter.text.replace(/\n/g, ' ')}]]\n`;
+      }
+
+      if (layer > 1) {
+        // print sub chapter
+        result += `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
+      } else {
+        // init highlight index for each chapter
+        highlightIndexMap.set(chapter.text, 1);
+      }
+
+      for (const child of chapter.children) {
+        result += getChapterBody(child, chapterName || chapter.text, layer + 1);
+      }
+      return result;
+    };
+
+    for (const chapter of chapters) {
+      const chapterPath = this.getValueAfterFormat(this.config.chapterPath, {
+        chapterName: chapter.text,
+      });
+      const fullChapterPath = path.join(Convert.basePath, chapterPath);
+      const chapterTagContent = this.getTagContent(
+        this.config.properties.chapter,
+        { chapterName: chapter.text },
+      );
+      const chapterContent = `${chapterTagContent}
+${getChapterBody(chapter, chapter.text)}`;
+      fs.writeFileSync(`${fullChapterPath}.md`, chapterContent);
+
+      this.generateHighlights(chapter.text, chapter);
+    }
+  };
+
+  private generateHighlights = (mainChapterName: string, chapterNode: Node) => {
+    if (!this.highlightIndexMap.has(mainChapterName)) {
+      this.highlightIndexMap.set(mainChapterName, 1);
+    }
+
+    const highlightsFolder = path.dirname(
+      this.getValueAfterFormat(this.config.highlightsPath, {
+        chapterName: mainChapterName,
+        highlightNumber: this.highlightIndexMap.get(mainChapterName) || 1,
+      }),
+    );
+    const fullHighlightsFolder = path.join(Convert.basePath, highlightsFolder);
+    if (!fs.existsSync(fullHighlightsFolder)) {
+      fs.mkdirSync(fullHighlightsFolder, { recursive: true });
+    }
+
+    for (const child of chapterNode.children) {
+      if (child.type === 'highlight') {
+        const index = this.highlightIndexMap.get(mainChapterName) || 1;
+        this.highlightIndexMap.set(mainChapterName, index + 1);
+
+        const highlightPath = this.getValueAfterFormat(
+          this.config.highlightsPath,
+          {
+            chapterName: mainChapterName,
+            highlightText: child.text,
+            highlightNumber: index,
           },
         );
         const fullHighlightPath = path.join(Convert.basePath, highlightPath);
-        if (!fs.existsSync(path.dirname(fullHighlightPath))) {
-          fs.mkdirSync(path.dirname(fullHighlightPath), { recursive: true });
-        }
+
         const highlightTagContent = this.getTagContent(
           this.config.properties.highlight,
-          { chapterName, highlightText: highlightName, highlightNumber: index },
+          {
+            chapterName: mainChapterName,
+            highlightText: child.text,
+            highlightNumber: index,
+          },
         );
-        const highlightContent = `${highlightTagContent}
-${highlightName}
-`;
-        fs.writeFileSync(`${fullHighlightPath}.md`, highlightContent);
-      }
 
-      fs.writeFileSync(`${fullChapterPath}.md`, chapterContent);
-    };
-    Object.keys(highlight).forEach((chapterName) => {
-      generateChapter(chapterName, highlight[chapterName]);
-    });
+        const highlightContent = `${highlightTagContent}
+${child.text}`;
+        fs.writeFileSync(`${fullHighlightPath}.md`, highlightContent);
+      } else {
+        this.generateHighlights(mainChapterName, child);
+      }
+    }
   };
 
-  generateMindMap = (highlight: Highlight) => {
+  private generateMindMap = () => {
     if (!this.config.mindMapPath) {
-      throw new Error('mindMapFolder is required');
+      throw new Error('mindMapPath is required');
     }
 
     const mindMapPath = this.getValueAfterFormat(this.config.mindMapPath, {});
@@ -256,51 +232,69 @@ ${highlightName}
     if (!fs.existsSync(path.dirname(fullMindMapPath))) {
       fs.mkdirSync(path.dirname(fullMindMapPath), { recursive: true });
     }
-    const mindMapTagContent = this.getTagContent(
-      this.config.properties.mindMap,
-      {},
-    );
 
-    const getChapterTree = (
-      chapter: Highlight | string[],
-      layer = 1,
+    const highlightIndexMap = new Map<string, number>();
+    const getMindMapBody = (
+      chapters: Node[],
       chapterName?: string,
+      layer = 1,
     ) => {
       let result = '';
-      if (Array.isArray(chapter)) {
-        return chapter
-          .map(
-            (highlightName, index) =>
-              `${'  '.repeat(layer - 1)}- [[${this.getValueAfterFormat(
-                this.config.highlightsPath,
-                {
-                  chapterName,
-                  highlightText: highlightName,
-                  highlightNumber: ++index,
-                },
-              )}|${highlightName.replace(/\n/g, ' ')}]]\n`,
-          )
-          .join('');
-      }
-      for (const key in chapter) {
-        const value = chapter[key];
-        result += `${'  '.repeat(layer - 1)}- ${key}\n`;
-        result += getChapterTree(value, layer + 1, chapterName || key);
+      for (const chapter of chapters) {
+        if (!highlightIndexMap.has(chapterName || chapter.text)) {
+          highlightIndexMap.set(chapterName || chapter.text, 1);
+        }
+
+        if (chapter.type === 'highlight') {
+          const highlightIndex =
+            highlightIndexMap.get(chapterName || chapter.text) || 1;
+          highlightIndexMap.set(
+            chapterName || chapter.text,
+            highlightIndex + 1,
+          );
+          result += `${'  '.repeat(layer - 1)}- [[${this.getValueAfterFormat(
+            this.config.highlightsPath,
+            {
+              chapterName: chapterName || chapter.text,
+              highlightText: chapter.text,
+              highlightNumber: highlightIndex,
+            },
+          )}|${chapter.text.replace(/\n/g, ' ')}]]\n`;
+        } else if (layer === 1) {
+          result += `- [[${chapter.text}]]\n`;
+        } else {
+          result += `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
+        }
+        for (const child of chapter.children) {
+          result += getMindMapBody(
+            [child],
+            chapterName || chapter.text,
+            layer + 1,
+          );
+        }
       }
       return result;
     };
 
-    const mindMapContent = `${mindMapTagContent}
-${getChapterTree(highlight)}
-`;
-    fs.writeFileSync(`${fullMindMapPath}.md`, mindMapContent);
+    const mindMapContent = `${this.getTagContent(this.config.properties.mindMap, {})}
+${getMindMapBody(this.book!.getChapters())}`;
+    fs.writeFileSync(
+      `${path.join(Convert.basePath, mindMapPath)}.md`,
+      mindMapContent,
+    );
+  };
+
+  generate = () => {
+    this.generateBook();
+    this.generateChaptersAndHighlights();
+    if (this.config.generatedMindMap) {
+      this.generateMindMap();
+    }
   };
 
   startProcess = () => {
-    const highlight = this.getHighlights() as Highlight;
-    this.generateFiles(highlight);
-    if (!this.config.generatedMindMap) return;
-
-    this.generateMindMap(highlight);
+    console.log('Generating...');
+    this.generate();
+    console.log('Done');
   };
 }
