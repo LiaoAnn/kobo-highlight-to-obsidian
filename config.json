@@ -1,0 +1,37 @@
+{
+  "fileName": "input.txt",
+  "bookPath": "books/{book_name}",
+  "chapterPath": "chapters/{book_name}/{chapter_name}",
+  "highlightsPath": "highlights/{book_name}/{chapter_name}/{chapter_name} No.{highlight_number}",
+  "generatedMindMap": false,
+  "mindMapPath": "mind_maps/{book_name}",
+  "properties": {
+    "book": {
+      "aliases": ["testing book"],
+      "created_at": "{today_date}",
+      "updated_at": "{today_date}",
+      "author": "\"[[some_author]]\"",
+      "tags": ["book"]
+    },
+    "chapter": {
+      "created_at": "{today_date}",
+      "updated_at": "{today_date}",
+      "book": "\"[[some_book]]\"",
+      "tags": ["chapter"]
+    },
+    "highlight": {
+      "aliases": ["{highlight_text_sl}"],
+      "created_at": "{today_date}",
+      "updated_at": "{today_date}",
+      "book": "[[some_book]]",
+      "chapter": "[[some_chapter]]",
+      "tags": ["highlight"]
+    },
+    "mindMap": {
+      "created_at": "{today_date}",
+      "updated_at": "{today_date}",
+      "book": "\"[[some_book]]\"",
+      "tags": ["mind_map"]
+    }
+  }
+}
