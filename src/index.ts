@@ -5,7 +5,6 @@ import { Convert } from './convert';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isConfig = (config: any): config is Config => {
   const {
-    fileName,
     bookPath,
     chapterPath,
     highlightsPath,
@@ -14,7 +13,6 @@ const isConfig = (config: any): config is Config => {
     properties,
   } = config;
   return (
-    typeof fileName === 'string' &&
     typeof bookPath === 'string' &&
     typeof chapterPath === 'string' &&
     typeof highlightsPath === 'string' &&

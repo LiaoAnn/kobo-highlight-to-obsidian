@@ -9,7 +9,6 @@ export type Property = {
 };
 
 export type Config = {
-  fileName: string;
   bookPath: string;
   chapterPath: string;
   highlightsPath: string;

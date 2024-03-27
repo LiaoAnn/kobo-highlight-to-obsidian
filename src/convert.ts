@@ -12,7 +12,7 @@ export class Convert {
   constructor(config: Config) {
     this.config = config;
 
-    const fileName = this.config.fileName;
+    const fileName = `input.txt`;
     if (!fs.existsSync(fileName)) throw new Error(`${fileName} not found`);
     const inputFile = fs.readFileSync(fileName, 'utf-8');
     const lines = inputFile.split('\n');

@@ -1,5 +1,4 @@
 {
-  "fileName": "input.txt",
   "bookPath": "books/{book_name}",
   "chapterPath": "chapters/{book_name}/{chapter_name}",
   "highlightsPath": "highlights/{book_name}/{chapter_name}/{chapter_name} No.{highlight_number}",
