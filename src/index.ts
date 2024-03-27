@@ -9,7 +9,7 @@ const isConfig = (config: any): config is Config => {
     chapterPath,
     highlightsPath,
     generatedMindMap,
-    mindMapFolder,
+    mindMapPath,
     properties,
   } = config;
   return (
@@ -17,7 +17,7 @@ const isConfig = (config: any): config is Config => {
     typeof chapterPath === 'string' &&
     typeof highlightsPath === 'string' &&
     typeof generatedMindMap === 'boolean' &&
-    (mindMapFolder === undefined || typeof mindMapFolder === 'string') &&
+    (mindMapPath === undefined || typeof mindMapPath === 'string') &&
     properties &&
     typeof properties === 'object' &&
     typeof properties.book === 'object' &&
