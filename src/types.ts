@@ -14,6 +14,7 @@ export type Config = {
   highlightsPath: string;
   generatedMindMap: boolean;
   mindMapPath?: string;
+  usingHeadings: boolean;
   properties: {
     book?: Property;
     chapter?: Property;

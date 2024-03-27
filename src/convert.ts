@@ -132,7 +132,7 @@ ${this.book
         const highlightIndex = highlightIndexMap.get(chapterName!) || 1;
         highlightIndexMap.set(chapterName!, highlightIndex + 1);
 
-        return `${'  '.repeat(layer - 1)}- [[${this.getValueAfterFormat(
+        return `${'  '.repeat(layer - 2)}- [[${this.getValueAfterFormat(
           this.config.highlightsPath,
           {
             chapterName,
@@ -144,7 +144,9 @@ ${this.book
 
       if (layer > 1) {
         // print sub chapter
-        result += `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
+        result += this.config.usingHeadings
+          ? `\n${'#'.repeat(layer - 1)} ${chapter.text}\n\n`
+          : `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
       } else {
         // init highlight index for each chapter
         highlightIndexMap.set(chapter.text, 1);
@@ -252,18 +254,21 @@ ${child.text}`;
             chapterName || chapter.text,
             highlightIndex + 1,
           );
-          result += `${'  '.repeat(layer - 1)}- [[${this.getValueAfterFormat(
+          const linkContent = `[[${this.getValueAfterFormat(
             this.config.highlightsPath,
             {
               chapterName: chapterName || chapter.text,
               highlightText: chapter.text,
               highlightNumber: highlightIndex,
             },
-          )}|${chapter.text.replace(/\n/g, ' ')}]]\n`;
-        } else if (layer === 1) {
-          result += `- [[${chapter.text}]]\n`;
+          )}|${chapter.text.replace(/\n/g, ' ')}]]`;
+          result += this.config.usingHeadings
+            ? `- ${linkContent}\n`
+            : `${'  '.repeat(layer - 1)}- ${linkContent}\n`;
         } else {
-          result += `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
+          result += this.config.usingHeadings
+            ? `\n${'#'.repeat(layer)} ${chapter.text}\n\n`
+            : `${'  '.repeat(layer - 1)}- ${chapter.text}\n`;
         }
         for (const child of chapter.children) {
           result += getMindMapBody(

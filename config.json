@@ -4,6 +4,7 @@
   "highlightsPath": "highlights/{book_name}/{chapter_name}/{chapter_name} No.{highlight_number}",
   "generatedMindMap": false,
   "mindMapPath": "mind_maps/{book_name}",
+  "usingHeadings": true,
   "properties": {
     "book": {
       "aliases": ["testing book"],
