@@ -9,6 +9,7 @@
   "scripts": {
     "clean:vault": "rm -rf vault/*",
     "dev": "yarn clean:vault && ts-node src/index.ts",
+    "build:image": "docker buildx build --push --no-cache --platform linux/amd64,linux/arm64 -t hub.liaoann.info/kobo/obsidian-highlight-importer:latest .",
     "start": "ts-node src/index.ts",
     "lint": "eslint --ignore-path .gitignore --ext .js,.ts",
     "format": "prettier --ignore-path .gitignore --write \"**/*.+(js|ts|json)\""
@@ -21,12 +22,12 @@
     "eslint": "^8.57.0",
     "nodemon": "^3.1.0",
     "prettier": "^3.2.5",
-    "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
   },
   "dependencies": {
     "@swc/cli": "^0.3.10",
     "@swc/core": "^1.4.5",
-    "fs-extra": "^11.2.0"
+    "fs-extra": "^11.2.0",
+    "ts-node": "^10.9.2"
   }
 }
