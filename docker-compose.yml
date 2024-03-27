@@ -1,0 +1,9 @@
+version: '3.3'
+
+services:
+  obisidan-highlight-importer:
+    build: ./
+    volumes:
+      - ~/Documents/ObsidianVaults/books:/app/vault
+      - ./config.json:/app/config.json
+      - ./input.txt:/app/input.txt
